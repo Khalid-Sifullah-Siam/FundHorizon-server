@@ -20,6 +20,29 @@ const CREDIT_PACKAGES: CreditPackage[] = [
   { credits: 1500, amount: 110 },
 ];
 
+const fulfillCheckoutSession = async (session: Stripe.Checkout.Session): Promise<void> => {
+  const credits = Number(session.metadata?.credits ?? 0);
+  const email = session.metadata?.userEmail ?? "";
+  if (!credits || !email || session.payment_status !== "paid") return;
+  if (await Payment.exists({ transactionId: session.id })) return;
+
+  try {
+    await Payment.create({
+      userEmail: email,
+      userName: session.metadata?.userName || email,
+      credits,
+      amount: Number(session.amount_total) / 100,
+      paymentSystem: "Stripe",
+      transactionId: session.id,
+      status: "succeeded",
+    });
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) return;
+    throw error;
+  }
+  await User.updateOne({ email }, { $inc: { credits } });
+};
+
 // Public: list purchasable credit packages (10 credits = $1)
 export const getPackages = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json({ success: true, packages: CREDIT_PACKAGES });
@@ -77,12 +100,39 @@ export const createPaymentIntent = async (req: Request, res: Response): Promise<
       },
     ],
     mode: "payment",
-    success_url: `${process.env.CLIENT_URL}/dashboard/payment-history?status=success`,
+    success_url: `${process.env.CLIENT_URL}/dashboard/payment-history?status=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.CLIENT_URL}/dashboard/purchase-credit?status=cancel`,
     metadata: { credits: String(credits), userEmail: req.user!.email, userName: req.user!.name },
   });
 
   res.status(200).json({ success: true, url: session.url });
+};
+
+// Supporter: verify the paid Checkout Session after Stripe redirects back.
+export const confirmPayment = async (req: Request, res: Response): Promise<void> => {
+  if (!stripe) {
+    res.status(503).json({ success: false, message: "Stripe is not configured." });
+    return;
+  }
+
+  const sessionId = String(req.body.sessionId || "");
+  if (!sessionId.startsWith("cs_")) {
+    res.status(400).json({ success: false, message: "Invalid checkout session." });
+    return;
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.metadata?.userEmail !== req.user!.email) {
+    res.status(403).json({ success: false, message: "This payment does not belong to you." });
+    return;
+  }
+  if (session.payment_status !== "paid") {
+    res.status(409).json({ success: false, message: "Payment is still pending." });
+    return;
+  }
+
+  await fulfillCheckoutSession(session);
+  res.status(200).json({ success: true, message: "Payment confirmed and credits added." });
 };
 
 // Stripe webhook to confirm successful payments (only used when Stripe is configured)
@@ -106,24 +156,7 @@ export const stripeWebhook = async (req: Request, res: Response): Promise<void> 
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const credits = Number(session.metadata?.credits ?? 0);
-    const email = session.metadata?.userEmail ?? "";
-    if (credits && email) {
-      if (await Payment.exists({ transactionId: session.id })) {
-        res.json({ received: true });
-        return;
-      }
-      await Payment.create({
-        userEmail: email,
-        userName: session.metadata?.userName || email,
-        credits,
-        amount: Number(session.amount_total) / 100,
-        paymentSystem: "Stripe",
-        transactionId: session.id,
-        status: "succeeded",
-      });
-      await User.updateOne({ email }, { $inc: { credits } });
-    }
+    await fulfillCheckoutSession(session);
   }
 
   res.json({ received: true });
