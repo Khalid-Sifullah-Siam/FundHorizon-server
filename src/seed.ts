@@ -54,6 +54,24 @@ const seedAdmin = async (): Promise<void> => {
   );
   console.log(`Demo supporter synchronized: ${demoEmail}`);
 
+  const creatorEmail = (process.env.DEMO_CREATOR_EMAIL ?? "creator@crowdfund.com").toLowerCase();
+  const creatorPassword = process.env.DEMO_CREATOR_PASSWORD ?? "Creator@12345";
+  const creatorHash = await bcrypt.hash(creatorPassword, 10);
+  await User.findOneAndUpdate(
+    { email: creatorEmail },
+    {
+      $set: {
+        name: "Demo Creator",
+        password: creatorHash,
+        photoURL: "https://i.ibb.co/0Q8c0cX/default.png",
+        role: "creator",
+      },
+      $setOnInsert: { credits: 20 },
+    },
+    { upsert: true, new: true, runValidators: true }
+  );
+  console.log(`Demo creator synchronized: ${creatorEmail}`);
+
   await mongoose.disconnect();
   console.log("Done.");
 };

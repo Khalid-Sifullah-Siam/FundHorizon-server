@@ -155,10 +155,10 @@ export const myCampaigns = async (req: Request, res: Response): Promise<void> =>
 };
 
 export const updateCampaign = async (req: Request, res: Response): Promise<void> => {
-  const { title, shortDescription, story, rewardInfo } = req.body;
+  const { title, story, rewardInfo } = req.body;
   const campaign = await Campaign.findOneAndUpdate(
     { _id: req.params.id, creatorEmail: req.user!.email },
-    { title, shortDescription, story, rewardInfo },
+    { title, story, rewardInfo },
     { new: true, runValidators: true }
   );
   if (!campaign) {
@@ -203,9 +203,13 @@ export const creatorHomeStats = async (req: Request, res: Response): Promise<voi
   const email = req.user!.email;
   const [total, active, contributions] = await Promise.all([
     Campaign.countDocuments({ creatorEmail: email }),
-    Campaign.countDocuments({ creatorEmail: email, deadline: { $gte: new Date() } }),
+    Campaign.countDocuments({
+      creatorEmail: email,
+      status: "approved",
+      deadline: { $gte: new Date() },
+    }),
     Campaign.aggregate([
-      { $match: { creatorEmail: email } },
+      { $match: { creatorEmail: email, status: "approved" } },
       { $group: { _id: null, totalRaised: { $sum: "$amountRaised" } } },
     ]),
   ]);

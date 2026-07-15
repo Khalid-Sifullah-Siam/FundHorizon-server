@@ -6,3 +6,5 @@ dist
 # test helpers (local only)
 test-helper/
 server.log
+.vercel
+.env.local

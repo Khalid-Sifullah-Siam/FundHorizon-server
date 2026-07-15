@@ -2,6 +2,8 @@
 
 Express, TypeScript, and MongoDB API for the FundHorizon crowdfunding platform.
 
+**Live API:** https://fund-horizon-server.vercel.app
+
 ## Stack
 
 - Node.js, Express, TypeScript, and Mongoose

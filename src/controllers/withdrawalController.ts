@@ -41,8 +41,11 @@ export const requestWithdrawal = async (req: Request, res: Response): Promise<vo
   const { withdrawalCredit, paymentSystem, accountNumber } = req.body;
 
   const credits = Number(withdrawalCredit);
-  if (!Number.isInteger(credits) || credits < 1) {
-    res.status(400).json({ success: false, message: "Valid withdrawal credit amount is required." });
+  if (!Number.isInteger(credits) || credits < MIN_WITHDRAWAL_CREDITS) {
+    res.status(400).json({
+      success: false,
+      message: `Minimum withdrawal is ${MIN_WITHDRAWAL_CREDITS} credits.`,
+    });
     return;
   }
 
