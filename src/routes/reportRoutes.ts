@@ -9,8 +9,8 @@ import {
 
 const router = Router();
 
-// Supporter
-router.post("/", protect, restrictTo("supporter"), asyncHandler(createReport));
+// Supporter or creator
+router.post("/", protect, restrictTo("supporter", "creator"), asyncHandler(createReport));
 
 // Admin
 router.get("/", protect, restrictTo("admin"), asyncHandler(getReports));

@@ -10,6 +10,13 @@ export type CampaignCategory =
   | "Environment"
   | "Other";
 
+export interface ICampaignUpdate {
+  _id?: mongoose.Types.ObjectId;
+  title: string;
+  message: string;
+  createdAt: Date;
+}
+
 export interface ICampaign extends Document {
   title: string;
   shortDescription: string;
@@ -24,6 +31,7 @@ export interface ICampaign extends Document {
   creatorEmail: string;
   amountRaised: number;
   status: CampaignStatus;
+  updates: ICampaignUpdate[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +59,13 @@ const campaignSchema = new Schema<ICampaign>(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+    updates: [
+      {
+        title: { type: String, required: true, trim: true, maxlength: 120 },
+        message: { type: String, required: true, trim: true, maxlength: 2000 },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

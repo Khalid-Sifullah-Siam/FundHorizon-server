@@ -168,6 +168,41 @@ export const updateCampaign = async (req: Request, res: Response): Promise<void>
   res.status(200).json({ success: true, campaign });
 };
 
+export const postCampaignUpdate = async (req: Request, res: Response): Promise<void> => {
+  const title = String(req.body.title || "").trim();
+  const message = String(req.body.message || "").trim();
+  if (!title || !message) {
+    res.status(400).json({ success: false, message: "Update title and message are required." });
+    return;
+  }
+
+  const campaign = await Campaign.findOneAndUpdate(
+    { _id: req.params.id, creatorEmail: req.user!.email, status: "approved" },
+    { $push: { updates: { title, message, createdAt: new Date() } } },
+    { new: true, runValidators: true }
+  );
+  if (!campaign) {
+    res.status(404).json({ success: false, message: "Approved campaign not found or not owned by you." });
+    return;
+  }
+
+  const supporterEmails = await Contribution.distinct("supporterEmail", {
+    campaignId: campaign._id,
+    status: "approved",
+  });
+  await Promise.all(
+    supporterEmails.map((email) =>
+      createNotification({
+        message: `New update from "${campaign.title}": ${title}`,
+        toEmail: email,
+        actionRoute: `/campaign/${campaign._id}`,
+      })
+    )
+  );
+
+  res.status(201).json({ success: true, campaign, message: "Campaign update published." });
+};
+
 // Delete a campaign and refund all approved contributors
 export const deleteCampaign = async (req: Request, res: Response): Promise<void> => {
   const filter = req.user!.role === "admin"
