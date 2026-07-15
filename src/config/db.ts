@@ -1,0 +1,29 @@
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import dns from "dns";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+export const connectDB = async (): Promise<void> => {
+  const uri = process.env.MONGODB_URI;
+  const dbName = process.env.DB_NAME ?? "crowdfunding";
+
+  if (!uri) {
+    throw new Error("MONGODB_URI is not defined in the environment variables.");
+  }
+
+  try {
+    await mongoose.connect(uri, { dbName });
+    console.log(`✅ MongoDB connected (db: ${dbName})`);
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:", (error as Error).message);
+    process.exit(1);
+  }
+};
